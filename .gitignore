@@ -1,0 +1,23 @@
+# 编译产物
+/kefu
+/kefu.exe
+/dist/
+
+# 运行数据（客户聊天记录、资料、素材，绝不能提交）
+kefu-data/
+
+# 业务资料（可能含敏感信息）
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.pdf
+
+# 本地测试临时目录
+.tmptest/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

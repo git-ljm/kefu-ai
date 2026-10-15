@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客服 AI 助手</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">🤖 客服 AI 助手</div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-page="work" role="tab">💬 接待工作台</button>
+    <button class="tab" data-page="docs" role="tab">📚 资料库</button>
+    <button class="tab" data-page="media" role="tab">🖼️ 素材库</button>
+    <button class="tab" data-page="stats" role="tab">📊 数据统计</button>
+    <button class="tab" data-page="settings" role="tab">⚙️ 设置</button>
+  </nav>
+  <div id="aiStatus" class="ai-status" title="AI 模型连接状态">● 检查中…</div>
+</header>
+
+<div id="dataWarn" class="alert warn hidden data-warn" role="alert"></div>
+
+<!-- ============ 接待工作台 ============ -->
+<main id="page-work" class="page work active">
+  <aside class="col-left">
+    <button class="btn primary block" id="btnNewCustomer">＋ 新建客户会话</button>
+    <div class="search-box">
+      <!-- type=search + 随机 name + 各密码管理器的忽略标记：防止浏览器把保存的“用户名”自动填进来 -->
+      <input id="customerSearch" class="input" type="search" name="kefu-customer-filter" placeholder="🔍 搜索客户" aria-label="搜索客户"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+      <button id="btnClearSearch" class="search-clear hidden" type="button" aria-label="清除搜索" title="清除搜索">×</button>
+    </div>
+    <ul id="customerList" class="customer-list"></ul>
+  </aside>
+
+  <section class="col-center">
+    <div id="welcome" class="welcome">
+      <div id="welcomeHasCustomers" class="hidden">
+        <h2>👈 请从左侧选择一个客户继续接待</h2>
+        <p class="muted">所有客户和聊天记录都保存在本地，点左侧客户名字就能看到历史记录。<br>新客户才需要点「＋ 新建客户会话」。</p>
+      </div>
+      <div id="welcomeGuide">
+      <h2>👋 欢迎使用，三步开始</h2>
+      <ol>
+        <li><b>设置</b>：在「⚙️ 设置」里测试 AI 是否连接成功</li>
+        <li><b>导入资料</b>：在「📚 资料库」把产品表格、文档、图片、历史聊天拖进去</li>
+        <li><b>接待客户</b>：点左边「＋ 新建客户会话」，把客户发来的话或截图粘贴进来，AI 会写好回复</li>
+      </ol>
+      </div>
+    </div>
+
+    <div id="chatArea" class="chat-area hidden">
+      <div class="chat-head">
+        <div><span id="chatName" class="chat-name"></span> <span id="chatPlatform" class="badge"></span></div>
+        <label class="switch"><input type="checkbox" id="toggleZh"> 显示中文翻译</label>
+      </div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+
+      <div id="suggestBox" class="suggest hidden">
+        <div class="suggest-tags" id="suggestTags"></div>
+        <div id="suggestRisk" class="alert danger hidden"></div>
+        <div id="suggestMissing" class="alert warn hidden"></div>
+        <label class="label" for="replyText">AI 建议回复（可以直接修改）</label>
+        <textarea id="replyText" class="input reply-text" rows="4"></textarea>
+        <div id="replyZh" class="zh-text"></div>
+        <div class="row wrap">
+          <button class="btn success" id="btnAccept">✅ 采纳并复制</button>
+          <button class="btn" data-hint="回复更简短">✂️ 更简短</button>
+          <button class="btn" data-hint="语气更正式专业">👔 更正式</button>
+          <button class="btn" data-hint="语气更亲切热情">😊 更热情</button>
+          <button class="btn" id="btnRegen">🔄 换一个</button>
+          <button class="btn" id="btnWriteZh">✍️ 我用中文写</button>
+          <button class="btn ghost" id="btnCloseSuggest">关闭</button>
+        </div>
+        <div id="zhWriter" class="zh-writer hidden">
+          <textarea id="zhInput" class="input" rows="2" placeholder="用中文写你想说的话，例如：亲，这款明天发货，3-5天到"></textarea>
+          <button class="btn primary" id="btnZhTranslate">🌐 翻译成客户的语言</button>
+        </div>
+        <div id="suggestMedia" class="suggest-media hidden">
+          <div class="label">🖼️ 建议一起发给客户的图片/视频 <span id="mediaReason" class="tip"></span></div>
+          <div id="mediaPicked" class="media-strip"></div>
+          <details id="mediaMoreBox"><summary class="tip">其他相关素材（AI 没选，需要可以勾上）</summary><div id="mediaMore" class="media-strip"></div></details>
+        </div>
+        <div class="row">
+          <input class="input" id="mediaFind" placeholder="🔍 找素材发给客户，例如：黑色实拍 / 防水视频 / 包装">
+          <button class="btn" id="btnMediaFind">搜索素材</button>
+        </div>
+        <div id="mediaFound" class="media-strip"></div>
+        <details id="suggestSources" class="sources"><summary>📎 参考了哪些资料</summary><div></div></details>
+      </div>
+
+      <div class="composer" id="composer">
+        <div class="row composer-head">
+          <span class="composer-title">① 把消息粘贴到这里（文字或截图都可以，截图直接 Ctrl+V / ⌘+V）</span>
+          <span class="spacer"></span>
+          <label class="radio"><input type="radio" name="role" value="customer" checked> 客户说的</label>
+          <label class="radio" title="在聊天软件里已经发出去的话，记录下来让 AI 了解上下文"><input type="radio" name="role" value="agent"> 我方已发的</label>
+        </div>
+        <textarea id="inputText" class="input" rows="3" placeholder="例如：Hi, where is my order #12345? It's been 10 days..."></textarea>
+        <div id="imagePreview" class="image-preview"></div>
+        <div class="row">
+          <label class="btn">📷 选择截图<input type="file" id="imageInput" accept="image/*" multiple hidden></label>
+          <span class="tip">按 Ctrl+Enter 也可以生成</span>
+          <span class="spacer"></span>
+          <button class="btn primary big" id="btnAnalyze">② 🤖 AI 分析并写回复</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="col-right hidden" id="profilePanel">
+    <h3>👤 客户资料</h3>
+    <label class="label">名称<input class="input" id="pfName"></label>
+    <label class="label">来源平台<input class="input" id="pfPlatform" placeholder="如 WhatsApp / Amazon / 独立站"></label>
+    <label class="label">标签<input class="input" id="pfTags" placeholder="如 VIP, 美国, 批发"></label>
+    <label class="label">客服备注（AI 会参考）<textarea class="input" id="pfNotes" rows="3" placeholder="如 订单号 12345，偏爱黑色"></textarea></label>
+    <div class="row"><button class="btn primary" id="btnSaveCustomer">保存</button><button class="btn danger ghost" id="btnDeleteCustomer">删除客户</button></div>
+    <h3>🧠 AI 客户画像 <button class="btn small" id="btnProfile">🔄 更新</button></h3>
+    <div id="profileView" class="profile-view"><p class="muted">聊几句后点「更新」，AI 会总结这个客户的特点（每 3 条消息也会自动更新）</p></div>
+  </aside>
+</main>
+
+<!-- ============ 资料库 ============ -->
+<main id="page-docs" class="page">
+  <div class="docs-wrap">
+    <div class="upload-grid">
+      <div class="card drop" data-kind="doc">
+        <h3>📁 产品 / 政策资料</h3>
+        <p class="muted">Excel、Word、PDF、TXT、PPT、图片（价格表、尺码表、产品图…）。没有后缀的文本文件也可以，程序会自动识别</p>
+        <div class="row">
+          <label class="btn primary">选择文件<input type="file" multiple hidden data-kind="doc"></label>
+          <label class="btn">选择整个文件夹<input type="file" webkitdirectory hidden data-kind="doc"></label>
+        </div>
+        <p class="tip">也可以直接把文件拖到这里</p>
+      </div>
+      <div class="card drop" data-kind="history">
+        <h3>💬 历史聊天记录</h3>
+        <p class="muted">以前成交过的聊天记录（TXT / Excel / CSV / 截图），AI 会学习其中的话术</p>
+        <div class="row">
+          <label class="btn primary">选择文件<input type="file" multiple hidden data-kind="history"></label>
+          <label class="btn">选择整个文件夹<input type="file" webkitdirectory hidden data-kind="history"></label>
+        </div>
+        <p class="tip">也可以直接把文件拖到这里</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="label" style="margin:0">🔑 文件打开密码（可选，有密码的 Excel/Word 填这里再上传）
+        <input class="input" id="uploadPassword" type="password" name="kefu-file-password" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore style="max-width:260px"></label>
+      <span class="tip">密码只用于本次导入，不会保存</span>
+    </div>
+
+    <div class="card" id="snippetCard">
+      <div class="row">
+        <h3>✍️ 自定义话术 <span class="tip" id="snippetCount"></span></h3>
+        <span class="spacer"></span>
+        <input class="input" id="snippetQ" type="search" placeholder="🔍 搜索话术" autocomplete="off" data-lpignore="true" style="max-width:220px">
+        <button class="btn primary" id="btnNewSnippet">＋ 新增话术</button>
+      </div>
+      <p class="muted">不用上传文件，直接写「遇到什么情况 → 怎么回」。AI 回复时会优先用这里的话术。聊天记录里我方的回复也可以点「⭐ 存为话术」一键保存。</p>
+      <table class="table snippet-table">
+        <thead><tr><th style="width:90px">分类</th><th style="width:180px">场景 / 标题</th><th>客户常见问法</th><th>推荐回复</th><th style="width:110px">操作</th></tr></thead>
+        <tbody id="snippetTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>🔍 问一下 AI：能查到什么？</h3>
+      <p class="muted">像客户一样提问，AI 会同时查资料库、自定义话术和素材库，给出回答和可以发的图片/视频。资料库里没有的通用知识可以联网查。</p>
+      <div class="row">
+        <input class="input" id="searchQ" type="search" placeholder="例如：退货政策是什么？ / 订单 A12345 发货了吗？ / 肽需要冷藏吗？" autocomplete="off" data-lpignore="true">
+        <select class="input" id="askWeb" style="width:auto" aria-label="联网搜索" title="联网搜索">
+          <option value="off">🌐 不联网</option>
+          <option value="auto">🌐 资料库没有时联网</option>
+          <option value="always">🌐 总是联网</option>
+        </select>
+        <button class="btn primary" id="btnSearch">问 AI</button>
+      </div>
+      <div id="askWebHint" class="tip hidden">还没配置联网搜索服务，请到「⚙️ 设置 → ⑤ 联网搜索」填写</div>
+      <div id="searchResult"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h3>📋 已导入资料</h3><span class="spacer"></span><span id="reembedInfo" class="tip"></span>
+        <button class="btn" id="btnReembed" title="如果之前向量模型没装好，装好后点这里补全">🔧 补全向量</button></div>
+      <table class="table">
+        <thead><tr><th>文件名</th><th>类型</th><th>状态</th><th>片段数</th><th>操作</th></tr></thead>
+        <tbody id="docTable"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- ============ 素材库 ============ -->
+<main id="page-media" class="page">
+  <div class="docs-wrap wide">
+    <div class="card drop" data-kind="media">
+      <h3>🖼️ 发给客户的图片 / 视频</h3>
+      <p class="muted">实拍图、细节图、尺寸对比、使用视频、包装、发货/物流凭证、好评截图…。AI 会自动看懂每个素材的内容，回复客户时推荐该发哪个。
+        <br>小技巧：文件名起得清楚（如「X2-黑色-实拍-正面.jpg」「X2-防水测试.mp4」）能让推荐更准。</p>
+      <div class="row">
+        <input class="input" id="mediaTags" placeholder="可选：给这批素材统一加标签，如 X2音箱, 黑色" style="max-width:380px">
+        <label class="btn primary">选择文件<input type="file" multiple hidden data-kind="media" accept="image/*,video/*"></label>
+        <label class="btn">选择整个文件夹<input type="file" webkitdirectory hidden data-kind="media"></label>
+        <span class="tip">也可以直接拖到这里</span>
+      </div>
+      <div id="mediaUploadProgress" class="tip"></div>
+    </div>
+    <div class="row">
+      <input class="input" id="mediaQ" placeholder="🔍 按内容搜索素材，例如：黑色 实拍 / 包装 / 物流单">
+      <button class="btn primary" id="btnMediaQ">搜索</button>
+      <button class="btn" id="btnMediaAll">显示全部</button>
+    </div>
+    <div id="mediaGrid" class="media-grid"></div>
+  </div>
+</main>
+
+<!-- ============ 统计 ============ -->
+<main id="page-stats" class="page">
+  <div class="docs-wrap">
+    <div class="stat-grid" id="statCards"></div>
+    <div class="card"><h3>客户都在问什么</h3><div id="intentBars"></div></div>
+  </div>
+</main>
+
+<!-- ============ 设置 ============ -->
+<main id="page-settings" class="page">
+  <div class="docs-wrap settings">
+    <div class="card">
+      <h3>① 本地 AI（Ollama）</h3>
+      <p class="muted">Ollama 装在显卡电脑上。本机用填 http://127.0.0.1:11434；用另一台电脑的 Ollama 就填那台电脑的局域网 IP，如 http://192.168.1.20:11434</p>
+      <div class="row"><input class="input" id="s_ollama_url"><button class="btn primary" id="btnTest">测试连接</button></div>
+      <div id="testResult"></div>
+      <div class="grid3">
+        <label class="label">对话模型<input class="input" id="s_chat_model" list="modelList"></label>
+        <label class="label">看图模型（截图识别）<input class="input" id="s_vision_model" list="modelList"></label>
+        <label class="label">本地向量模型（资料检索）<input class="input" id="s_embed_model" list="modelList"></label>
+      </div>
+      <datalist id="modelList"></datalist>
+    </div>
+
+    <div class="card">
+      <h3>② 云端大模型（可选）</h3>
+      <p class="muted">选「云端」后，对话用云端模型；向量检索仍用本地 Ollama。支持任何 OpenAI 兼容接口（DeepSeek、通义千问、Kimi、OpenAI 等）。注意：客户聊天内容会发送到云端服务商。</p>
+      <div class="row">
+        <label class="radio"><input type="radio" name="provider" value="ollama"> 只用本地 Ollama</label>
+        <label class="radio"><input type="radio" name="provider" value="openai"> 使用云端 API</label>
+      </div>
+      <div class="grid2">
+        <label class="label">接口地址<input class="input" id="s_openai_base"></label>
+        <label class="label">API Key<input class="input" id="s_openai_key" type="password" name="kefu-api-key" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore></label>
+        <label class="label">对话模型名<input class="input" id="s_openai_model"></label>
+        <label class="label">看图模型名（留空则用本地）<input class="input" id="s_openai_vision"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🧭 向量模型（让 AI 按“意思”查资料）</h3>
+      <p class="muted">向量模型负责把资料变成“意思”，客户换个说法也能查到。注意：Qwen3.8-Flash、DeepSeek 这类是<b>对话模型</b>，不能当向量模型用。
+        云端可选阿里云百炼的 <code>text-embedding-v4</code> 或 <code>qwen3.7-text-embedding</code>。</p>
+      <div class="row">
+        <label class="radio"><input type="radio" name="embed_provider" value="ollama"> 本地 Ollama（上面填的本地向量模型，免费、不出本机）</label>
+        <label class="radio"><input type="radio" name="embed_provider" value="openai"> 云端向量模型</label>
+      </div>
+      <div class="grid2" id="embedCloudRows">
+        <label class="label">接口地址<input class="input" id="s_embed_base" autocomplete="off"></label>
+        <label class="label">API Key（留空则用上面云端大模型的 Key）<input class="input" id="s_embed_key" type="password" name="kefu-embed-key" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore></label>
+        <label class="label">模型名<input class="input" id="s_embed_cloud" list="embedModels" autocomplete="off"></label>
+        <label class="label">向量维度
+          <select class="input" id="s_embed_dim">
+            <option value="1024">1024（推荐）</option><option value="768">768</option><option value="512">512</option>
+            <option value="1536">1536</option><option value="2048">2048</option><option value="0">模型默认</option>
+          </select></label>
+      </div>
+      <datalist id="embedModels">
+        <option value="text-embedding-v4">百炼 · 通用，稳定</option>
+        <option value="qwen3.7-text-embedding">百炼 · 效果最好</option>
+        <option value="qwen3.7-text-embedding-flash">百炼 · 便宜、快</option>
+        <option value="text-embedding-3-small">OpenAI</option>
+      </datalist>
+      <div class="alert warn">⚠️ 切换向量模型（本地↔云端、换模型、换维度）后，程序会自动在后台重建全部资料的向量。期间检索暂时只能用关键词，完成后自动恢复。选云端时，资料内容会发送给云端服务商。</div>
+      <div class="row"><button class="btn" id="btnEmbedTest">测试向量模型</button><span class="tip">先保存设置再测试</span><span id="embedTestResult"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>③ 回复风格</h3>
+      <div class="row">
+        <label class="radio"><input type="radio" name="reply_language" value="en"> 固定用英文回复</label>
+        <label class="radio"><input type="radio" name="reply_language" value="auto"> 跟随客户语言（客户说西语就回西语）</label>
+      </div>
+      <label class="label">店铺介绍 &amp; 语气要求（AI 每次都会参考）
+        <textarea class="input" id="s_persona" rows="5"></textarea>
+      </label>
+    </div>
+    <div class="card">
+      <h3>⑤ 联网搜索（可选）</h3>
+      <p class="muted">资料库里没有的通用知识（产品常识、行业知识、快递常识等）可以上网查。本店的价格、库存、订单、发货等信息永远只用店铺资料，不会用网上的。
+        发出去的是 AI 提炼后的搜索关键词，会去掉客户姓名、订单号、联系方式。</p>
+      <div class="grid2">
+        <label class="label">搜索服务
+          <select class="input" id="s_web_provider">
+            <option value="">关闭</option>
+            <option value="model">大模型自带联网（阿里云百炼 Qwen，用上面「云端大模型」的 Key，不用另外申请）</option>
+            <option value="bocha">博查（国内可直接用，需要 API Key）</option>
+            <option value="ollama">Ollama 官方搜索（需要 ollama.com 的 API Key）</option>
+            <option value="tavily">Tavily（需要 API Key，每月有免费额度）</option>
+            <option value="searxng">SearXNG（自己部署，不需要 Key）</option>
+            <option value="ddg">DuckDuckGo（免费，不需要 Key，国内需要代理）</option>
+          </select></label>
+        <label class="label" id="webKeyRow">API Key<input class="input" id="s_web_key" type="password" name="kefu-web-key" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore></label>
+        <label class="label" id="webSearxRow">SearXNG 地址<input class="input" id="s_web_searxng" placeholder="http://192.168.1.20:8080" autocomplete="off"></label>
+        <div class="tip hidden" id="webModelTip">需要在「② 云端大模型」选「使用云端 API」，接口地址填百炼的 <code>https://dashscope.aliyuncs.com/compatible-mode/v1</code>。
+          本地 Ollama 模型自己不能上网。这个模式没有搜索结果列表，回答里会注明来源网站。</div>
+        <label class="label">代理（可选，访问国外服务用）<input class="input" id="s_web_proxy" placeholder="如 http://127.0.0.1:7890，不需要就留空" autocomplete="off"></label>
+      </div>
+      <div class="row">
+        <span>写客户回复时：</span>
+        <label class="radio"><input type="radio" name="web_reply" value="off"> 不联网</label>
+        <label class="radio"><input type="radio" name="web_reply" value="auto"> 资料库没有的通用问题自动联网（回复会标注“含网络信息”）</label>
+      </div>
+      <div class="row"><button class="btn" id="btnWebTest">测试联网搜索</button><span class="tip">先保存设置再测试</span></div>
+      <div id="webTestResult"></div>
+    </div>
+
+    <div class="card">
+      <h3>④ 数据存放与备份</h3>
+      <p>数据保存在：<code id="dataDir" class="path">…</code> <button class="btn small" id="btnOpenData">打开文件夹</button>
+        <span class="tip">程序版本 <span id="appVersion"></span></span></p>
+      <p class="muted">升级程序时只替换程序文件，不要动这个文件夹。每次升级后第一次启动会自动备份一次数据库（保存在 backups 文件夹，保留最近 5 份）。</p>
+      <div class="row">
+        <a class="btn primary" href="/api/backup/full" download>⬇️ 完整备份（含图片/视频）</a>
+        <a class="btn" href="/api/backup" download>⬇️ 只备份数据库（小）</a>
+      </div>
+      <p class="tip">恢复：关闭程序 → 解压完整备份，用里面的 kefu-data 文件夹替换现有文件夹 → 重新打开程序。</p>
+    </div>
+    <button class="btn primary big" id="btnSaveSettings">💾 保存设置</button>
+  </div>
+</main>
+
+<div id="toast" class="toast" role="status"></div>
+
+<dialog id="dlgCustomer">
+  <form method="dialog" class="dlg">
+    <h3>新建客户会话</h3>
+    <label class="label">客户名称 *<input class="input" id="ncName" required placeholder="如 John / WhatsApp 号码 / 订单号"></label>
+    <label class="label">来源平台<input class="input" id="ncPlatform" placeholder="如 WhatsApp"></label>
+    <label class="label">备注<textarea class="input" id="ncNotes" rows="2"></textarea></label>
+    <div class="row"><span class="spacer"></span><button class="btn" value="cancel" formnovalidate>取消</button><button class="btn primary" value="ok">创建</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgChunks">
+  <form method="dialog" class="dlg wide">
+    <h3 id="chunkTitle">资料内容预览</h3>
+    <div id="chunkList" class="chunk-list"></div>
+    <div class="row"><span class="spacer"></span><button class="btn primary">关闭</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgPassword">
+  <form method="dialog" class="dlg">
+    <h3>🔑 输入文件密码</h3>
+    <p class="muted" id="pwFileName"></p>
+    <label class="label">打开密码<input class="input" id="pwInput" type="password" name="kefu-file-password2" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore required></label>
+    <p class="tip">密码只用于这次导入，不会保存。</p>
+    <div class="row"><span class="spacer"></span><button class="btn" value="cancel" formnovalidate>取消</button><button class="btn primary" value="ok">导入</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgSnippet">
+  <form method="dialog" class="dlg wide" id="snippetForm">
+    <h3 id="snippetDlgTitle">新增话术</h3>
+    <div class="grid2">
+      <label class="label">场景 / 标题<input class="input" id="snTitle" placeholder="如：客户嫌贵 / 问发货时间 / 首次打招呼" autocomplete="off"></label>
+      <label class="label">分类（可选）<input class="input" id="snCategory" list="snippetCats" placeholder="如：谈价、物流、售后" autocomplete="off"></label>
+    </div>
+    <datalist id="snippetCats"></datalist>
+    <label class="label">客户常见问法（可选，每行一种，写得越多 AI 越容易匹配到）
+      <textarea class="input" id="snQuestion" rows="3" placeholder="It's too expensive&#10;Can you give me a discount?&#10;太贵了"></textarea></label>
+    <label class="label">推荐回复 *（可以直接写英文；也可以先写中文，再点下面的按钮翻译）
+      <textarea class="input" id="snAnswer" rows="6" required></textarea></label>
+    <div class="row">
+      <button class="btn" type="button" id="btnSnTranslate">🌐 把回复翻译成英文（保留中文对照）</button>
+      <span class="spacer"></span>
+      <button class="btn" value="cancel" formnovalidate>取消</button>
+      <button class="btn primary" value="ok">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgPreview">
+  <form method="dialog" class="dlg wide">
+    <div id="previewBody" class="preview-body"></div>
+    <div class="row"><span class="spacer"></span><button class="btn primary">关闭</button></div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+<script src="media.js"></script>
+<script src="snippet.js"></script>
+</body>
+</html>
